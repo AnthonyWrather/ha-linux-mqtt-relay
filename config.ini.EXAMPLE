@@ -14,9 +14,10 @@ interval = 60
 decimal_digits = 4
 
 [homeassistant]
-topic_config = ""
-topic_state = "state"
-topic_set = "set"
-topic_availability = "availability"
 
-
+device_name = /fan
+topic_base = homeassistant/switch
+topic_config = /conf
+topic_state = /state
+topic_set = /set
+topic_availability = /availability
