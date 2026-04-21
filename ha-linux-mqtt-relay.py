@@ -23,10 +23,8 @@ sensor_type = config['sensor'].get('type', 'dht22').lower()
 
 ###############################################################################
 
-# BROKER = config['mqtt'].get('broker', 'homeassistant.local').lower()
-# PORT = config['mqtt'].get('port', '1883').lower()
-BROKER = 'homeassistant.local'
-PORT = 1883
+BROKER = config['mqtt'].get('broker', 'homeassistant.local').lower()
+PORT = int(config['mqtt'].get('port', '1883'))
 # generate client ID with pub prefix randomly
 CLIENT_ID = f'python-mqtt-tcp-pub-sub-{random.randint(0, 1000)}'
 USERNAME = config['mqtt'].get('username', 'CONFIG_ME')
