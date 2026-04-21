@@ -1,0 +1,3 @@
+RPi.GPIO
+paho-mqtt
+configparser

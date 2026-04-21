@@ -1,0 +1,22 @@
+[mqtt]
+
+hostname = homeassistant.lan
+username = REPLACEME
+password = REPLACEME
+port = 1883
+timeout = 60
+
+[sensor]
+
+pin = 23
+type = dht11
+interval = 60
+decimal_digits = 4
+
+[homeassistant]
+topic_config = ""
+topic_state = "state"
+topic_set = "set"
+topic_availability = "availability"
+
+
