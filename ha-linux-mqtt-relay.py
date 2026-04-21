@@ -29,10 +29,8 @@ BROKER = 'homeassistant.local'
 PORT = 1883
 # generate client ID with pub prefix randomly
 CLIENT_ID = f'python-mqtt-tcp-pub-sub-{random.randint(0, 1000)}'
-# USERNAME = config['mqtt'].get('username', 'CONFIG_ME').lower()
-# PASSWORD = config['mqtt'].get('password', 'CONFIG_ME').lower()
-USERNAME = 'controlpi'
-PASSWORD = 'AbleMust14!'
+USERNAME = config['mqtt'].get('username', 'CONFIG_ME')
+PASSWORD = config['mqtt'].get('password', 'CONFIG_ME')
 
 FIRST_RECONNECT_DELAY = 1
 RECONNECT_RATE = 2
@@ -273,8 +271,9 @@ def dump_config_ini():
     print("config.ini")
     print("[mqtt]")
     print(f"broker = {config['mqtt'].get('broker').lower()}")
-    print(f"username = {config['mqtt'].get('username').lower()}")
-    print(f"password = {config['mqtt'].get('password').lower()}")
+    print(f"username = {config['mqtt'].get('username')}")
+    # print(f"password = {config['mqtt'].get('password')}")
+    print("password = ***REDACTED***")
     print(f"port = {config['mqtt'].get('port').lower()}")
     print(f"timeout = {config['mqtt'].get('timeout').lower()}")
     print("[sensor]")
