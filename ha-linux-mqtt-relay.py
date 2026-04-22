@@ -18,7 +18,6 @@ from configparser import ConfigParser
 # Set up the config options.
 config = ConfigParser(delimiters=('=', ))
 config.read('config.ini')
-
 ###############################################################################
 
 BROKER = config['mqtt'].get('broker', 'homeassistant.local').lower()
@@ -87,11 +86,6 @@ TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD = {
   }
 }
 
-
-# These will move to a config file.
-pin = int(config['sensor'].get('pin', '23').lower())
-GPIO.setmode(GPIO.BCM)             # choose BCM or BOARD
-GPIO.setup(pin, GPIO.OUT)           # set GPIO23 as an output
 
 ###############################################################################
 
@@ -318,6 +312,10 @@ def run():
 
 
 if __name__ == '__main__':
+    pin = int(config['sensor'].get('pin', '23').lower())
+    GPIO.setmode(GPIO.BCM)             # choose BCM or BOARD
+    GPIO.setup(pin, GPIO.OUT)           # set GPIO23 as an output
+
     # Need to dump the config.
     # dump_config_ini()
     dump_topic_config()
