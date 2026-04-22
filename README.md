@@ -7,6 +7,14 @@
 
 A Python service that automatically creates a Linux device in Home Assistant to control a relay via MQTT. This project enables seamless integration of GPIO-controlled relays with Home Assistant using the MQTT Discovery protocol.
 
+This has been tested on the following hardware with generic 5V relays.
+
+- Raspberry Pi 2B running Trixie
+- Raspberry Pi 3B running Buster
+- Raspberry Pi 5B running Trixie
+
+Other versions of Linux should also work so long as they run Python 3.X 
+
 ## Features
 
 - **GPIO Relay Control**: Control GPIO-connected relays from Home Assistant

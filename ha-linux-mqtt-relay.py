@@ -37,7 +37,6 @@ MAX_RECONNECT_DELAY = config['mqtt'].get('timeout', '60').lower()
 
 # Define the main device and a single sensor.
 # Publish here to create or update the device.
-# TODO: Add in device name to topics and names.
 TOPIC_BASE = config['homeassistant'].get('topic_base', 'default/homeassistant/switch').lower() \
     + '/relay' + config['homeassistant'].get('device_name', '/device').lower()
 TOPIC_MAINCABIN_RELAY_CONFIG = TOPIC_BASE + config['mqtt'].get('topic_config', '/config').lower()
@@ -116,7 +115,6 @@ def on_connect(client, userdata, flags, rc):
             logging.info(f'Failed to set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
         else:
             logging.info(f'Successfully set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
-        # TODO: Need to subscribe to the command channel.
         logging.info(f'Subscribing to topic {TOPIC_MAINCABIN_RELAY_SET}')
         client.subscribe(TOPIC_MAINCABIN_RELAY_SET)
     else:
@@ -133,14 +131,13 @@ def on_disconnect(client, userdata, rc):
         try:
             client.reconnect()
             logging.info("Reconnected successfully!")
-            # TODO: Need to publish availability ONLINE
             result = client.publish(TOPIC_MAINCABIN_RELAY_AVAILABILITY, 'online')
             status = result[0]
             if status != 0:
                 logging.info(f'Failed to set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
             else:
                 logging.info(f'Successfully set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
-            # TODO: Maybe need to resubscribe?
+            # TODO: Discover if there is any scenario where I need to resubscribe?
             return
         except Exception as err:
             logging.error("%s. Reconnect failed. Retrying...", err)
@@ -153,8 +150,7 @@ def on_disconnect(client, userdata, rc):
 
 
 def on_message(client, userdata, msg):
-    # TODO: Need to filter the messages and set the pins.
-    # TODO: Need to publish device state.
+    # TODO: Need to rewite this to use the native 1 and 0 which avoids the conversion.
     logging.info('==================================================================')
     logging.info(f'Message `{msg.payload.decode()}` from `{msg.topic}` topic')
     match msg.payload.decode():
@@ -174,8 +170,7 @@ def on_message(client, userdata, msg):
 
 
 def connect_mqtt():
-    # TODO|: Need to update to a V2 interface.
-    # But get it working first lol
+    # TODO: Need to update this to a V2 interface.
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
         logging.info("Connecting in %d seconds...", reconnect_delay)
