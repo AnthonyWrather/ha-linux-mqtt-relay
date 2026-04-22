@@ -2,6 +2,7 @@
 A Python service to automatically create a Linux device to control a relay in Home Assistant via MQTT.
 
 =============================================
+
 In bin create ha-linux-mqtt-relay.sh
 
 ``` sh
