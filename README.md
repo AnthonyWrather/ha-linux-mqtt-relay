@@ -1,5 +1,10 @@
 # ha-linux-mqtt-relay
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Dependabot Status](https://img.shields.io/badge/Dependabot-enabled-025e8c?logo=dependabot)](https://dependabot.com)
+[![GitHub repo](https://img.shields.io/badge/github-repo-000)](https://github.com/AnthonyWrather/ha-linux-mqtt-relay)
+
 A Python service that automatically creates a Linux device in Home Assistant to control a relay via MQTT. This project enables seamless integration of GPIO-controlled relays with Home Assistant using the MQTT Discovery protocol.
 
 ## Features
