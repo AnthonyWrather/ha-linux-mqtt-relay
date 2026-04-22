@@ -9,9 +9,7 @@ timeout = 60
 [sensor]
 
 pin = 23
-type = dht11
 interval = 60
-decimal_digits = 4
 
 [homeassistant]
 

@@ -19,8 +19,6 @@ from configparser import ConfigParser
 config = ConfigParser(delimiters=('=', ))
 config.read('config.ini')
 
-sensor_type = config['sensor'].get('type', 'dht22').lower()
-
 ###############################################################################
 
 BROKER = config['mqtt'].get('broker', 'homeassistant.local').lower()
@@ -150,7 +148,7 @@ def on_disconnect(client, userdata, rc):
 
 
 def on_message(client, userdata, msg):
-    # TODO: Need to rewite this to use the native 1 and 0 which avoids the conversion.
+    # TODO: Need to rewrite this to use the native 1 and 0 which avoids the conversion.
     logging.info('==================================================================')
     logging.info(f'Message `{msg.payload.decode()}` from `{msg.topic}` topic')
     match msg.payload.decode():
@@ -264,15 +262,12 @@ def dump_config_ini():
     print("[mqtt]")
     print(f"broker = {config['mqtt'].get('broker').lower()}")
     print(f"username = {config['mqtt'].get('username')}")
-    # print(f"password = {config['mqtt'].get('password')}")
     print("password = ***REDACTED***")
     print(f"port = {config['mqtt'].get('port').lower()}")
     print(f"timeout = {config['mqtt'].get('timeout').lower()}")
     print("[sensor]")
     print(f"pin = {config['sensor'].get('pin').lower()}")
-    print(f"type = {config['sensor'].get('type').lower()}")
     print(f"interval = {config['sensor'].get('interval').lower()}")
-    print(f"decimal_digits = {config['sensor'].get('decimal_digits').lower()}")
     print("[homeassistant]")
     print(f"device_name = {config['homeassistant'].get('device_name').lower()}")
     print(f"topic_base = {config['homeassistant'].get('topic_base').lower()}")
@@ -315,7 +310,6 @@ def run():
     finally:
         # this ensures a clean GPIO exit
         GPIO.cleanup()
-        # TODO: Need to publish availability OFFLINE
         if client is not None and client.is_connected():
           result = client.publish(TOPIC_MAINCABIN_RELAY_AVAILABILITY, 'offline')
           status = result[0]

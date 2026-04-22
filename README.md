@@ -13,7 +13,7 @@ This has been tested on the following hardware with generic 5V relays.
 - Raspberry Pi 3B running Buster
 - Raspberry Pi 5B running Trixie
 
-Other versions of Linux should also work so long as they run Python 3.X 
+Other versions of Linux should also work so long as they run Python 3.X
 
 ## Features
 
@@ -97,9 +97,7 @@ topic_availability = /availability  # Availability status topic suffix
 ```conf
 [sensor]
 pin = 23                 # GPIO pin number (BCM numbering)
-type = dht11             # Sensor type (for future use)
 interval = 60            # Update interval in seconds
-decimal_digits = 4       # Decimal precision (for future use)
 ```
 
 #### [homeassistant] Section
@@ -124,9 +122,7 @@ timeout = 60
 
 [sensor]
 pin = 23
-type = dht11
 interval = 60
-decimal_digits = 4
 
 [homeassistant]
 device_name = /fan
