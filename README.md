@@ -3,9 +3,9 @@ A Python service to automatically create a Linux device to control a relay in Ho
 
 =============================================
 
-In bin create ha-linux-mqtt-relay.sh
+In ~/bin create ha-linux-mqtt-relay.sh
 
-``` sh
+``` bash
 #!/bin/bash
 cd /home/controlpi/Projects/adafruit/ha-linux-mqtt-relay
 source .ha-linux-mqtt-relay/bin/activate
