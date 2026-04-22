@@ -1,113 +1,180 @@
 # ha-linux-mqtt-relay
-A Python service to automatically create a Linux device to control a relay in Home Assistant via MQTT.<BR>
-Should work with any Raspberry Pi compatible relay device.<BR>
-To get started download this repository, edit the **config.ini** file and start a screen session.<BR>
-This assumes you already have **Python 3** and **screen** installed.<BR>
 
+A Python service that automatically creates a Linux device in Home Assistant to control a relay via MQTT. This project enables seamless integration of GPIO-controlled relays with Home Assistant using the MQTT Discovery protocol.
 
-## Initial Setup
+## Features
 
-Download the repo from GitHub and change into the new directory.
+- **GPIO Relay Control**: Control GPIO-connected relays from Home Assistant
+- **MQTT Discovery**: Automatic device discovery in Home Assistant (no manual configuration needed)
+- **Auto-Reconnection**: Robust MQTT reconnection handling with exponential backoff
+- **Availability Tracking**: Reports online/offline status to Home Assistant
+- **Configurable**: Fully configurable via `config.ini` (broker, credentials, GPIO pins, topics)
+- **Service Support**: Can run as a systemd service for persistent operation
 
-``` bash
+## Prerequisites
+
+- Raspberry Pi or compatible Linux device with GPIO support
+- Python 3.7+
+- MQTT broker (e.g., Home Assistant with MQTT addon, Mosquitto)
+- Relay module connected to a GPIO pin
+- GPIO libraries support (e.g., RPi.GPIO)
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
 git clone https://github.com/AnthonyWrather/ha-linux-mqtt-relay.git
 cd ha-linux-mqtt-relay
 ```
 
-Create the venv and install the requirements.
+### 2. Create Python Virtual Environment
 
-``` bash
-python -m venv .ha-linux-mqtt-relay
+```bash
+python3 -m venv .ha-linux-mqtt-relay
 source .ha-linux-mqtt-relay/bin/activate
 pip install -r requirements.txt
 ```
 
-If you don't have a ~/bin directory create one and optionally add it to your path.<BR>
-In ~/bin create ha-linux-mqtt-relay.sh
+### 3. Create Helper Script
 
-``` bash
+Create `~/bin/ha-linux-mqtt-relay.sh` (create the `~/bin` directory if it doesn't exist):
+
+```bash
 #!/bin/bash
-cd /home/controlpi/Projects/adafruit/ha-linux-mqtt-relay
+cd "$(dirname "$0")/../Projects/adafruit/ha-linux-mqtt-relay" || exit
 source .ha-linux-mqtt-relay/bin/activate
-while true; do python ha-linux-mqtt-relay.py; done;
+while true; do python ha-linux-mqtt-relay.py; done
 deactivate
 ```
-## Edit config.ini
 
-In this example you have
+Make it executable:
 
-* A Home Assistant server called **homeassistant.lan** with a user called **controlpi_mqtt** with a password of **CHANGE_ME**
-* The Home Assistant server has MQTT installed and running with the default **homeassistant** base.
-* A Raspberry Pi called **controlpi.lan** with a user called **controlpi** with a password of **CHANGE_ME**
-* On **controlpi.lan** there is a relay connected to PIN 23 which controls a fan.
+```bash
+chmod +x ~/bin/ha-linux-mqtt-relay.sh
+```
+## Configuration
 
-``` conf
+Copy `config.ini.EXAMPLE` to `config.ini` and update the following settings:
+
+```bash
+cp config.ini.EXAMPLE config.ini
+nano config.ini
+```
+
+### Configuration Parameters
+
+#### [mqtt] Section
+
+```conf
 [mqtt]
+broker = homeassistant.lan          # MQTT broker hostname or IP
+username = mqtt_user                # MQTT username
+password = your_secure_password     # MQTT password
+port = 1883                         # MQTT port (default: 1883)
+timeout = 60                        # Reconnection timeout in seconds
+topic_config = /config              # MQTT discovery config topic suffix
+topic_state = /state                # State publication topic suffix
+topic_set = /set                    # Command subscription topic suffix
+topic_availability = /availability  # Availability status topic suffix
+```
 
-broker = homeassistant.lan
+#### [sensor] Section
+
+```conf
+[sensor]
+pin = 23                 # GPIO pin number (BCM numbering)
+type = dht11             # Sensor type (for future use)
+interval = 60            # Update interval in seconds
+decimal_digits = 4       # Decimal precision (for future use)
+```
+
+#### [homeassistant] Section
+
+```conf
+[homeassistant]
+device_name = /fan              # Device identifier (used in MQTT topics)
+topic_base = homeassistant/switch  # Base topic for MQTT discovery
+```
+
+### Example Configuration
+
+Here's a typical setup example:
+
+```conf
+[mqtt]
+broker = homeassistant.local
 username = controlpi_mqtt
 password = CHANGE_ME
 port = 1883
 timeout = 60
 
 [sensor]
-
 pin = 23
 type = dht11
 interval = 60
 decimal_digits = 4
 
 [homeassistant]
-
 device_name = /fan
 topic_base = homeassistant/switch
-topic_config = /conf
+topic_config = /config
 topic_state = /state
 topic_set = /set
 topic_availability = /availability
 ```
 
-## Quick Start
+## Running the Service
 
-To run this from the command line.
+### Option 1: Manual Execution (Development/Testing)
 
-``` bash
-screen -dmS ha-linux-mqtt-relay
-screen -S ha-linux-mqtt-relay -p 0 -X '~/bin/ha-linux-mqtt-relay.sh\n'
+```bash
+# Activate the virtual environment
+source .ha-linux-mqtt-relay/bin/activate
+
+# Run the script
+python ha-linux-mqtt-relay.py
 ```
 
+### Option 2: Screen Session
 
-## Install as a service.
+```bash
+# Start a detached screen session
+screen -dmS ha-linux-mqtt-relay ~/bin/ha-linux-mqtt-relay.sh
 
-Follow the Initial Setup steps then create the service.
+# View logs
+screen -S ha-linux-mqtt-relay -X hardcopy -h -S - | tail -50
 
-``` bash
+# Attach to the session
+screen -r ha-linux-mqtt-relay
+
+# Detach from the session (press Ctrl+A, then D)
+```
+
+### Option 3: Systemd Service (Recommended for Production)
+
+#### Create the Service File
+
+```bash
 sudo systemctl edit --force --full ha-linux-mqtt-relay.service
-sudo systemctl edit ha-linux-mqtt-relay.service
 ```
 
-Place the following into the service.
+Paste the following configuration:
 
-``` conf
+```ini
 [Unit]
-Description=ha-linux-mqtt-relay daemon
+Description=ha-linux-mqtt-relay MQTT Relay Control Service
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=idle
+Type=simple
 User=controlpi
 Group=controlpi
-WorkingDirectory=/home/controlpi
+WorkingDirectory=/home/controlpi/Projects/adafruit/ha-linux-mqtt-relay
 ExecStart=/home/controlpi/bin/ha-linux-mqtt-relay.sh
-ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
-RestartSec=1
-TimeoutStartSec=10
-TimeoutStopSec=10
-Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games"
-
-# Logging
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=ha-linux-mqtt-relay
@@ -116,12 +183,114 @@ SyslogIdentifier=ha-linux-mqtt-relay
 WantedBy=multi-user.target
 ```
 
-And you can use the following to enable and check on the service.
+#### Enable and Start the Service
 
-``` bash
+```bash
+# Reload systemd configuration
+sudo systemctl daemon-reload
+
+# Enable the service to start on boot
 sudo systemctl enable ha-linux-mqtt-relay.service
-sudo systemctl status ha-linux-mqtt-relay.service
+
+# Start the service
 sudo systemctl start ha-linux-mqtt-relay.service
-sudo systemctl restart ha-linux-mqtt-relay.service
+
+# Check service status
+sudo systemctl status ha-linux-mqtt-relay.service
+
+# View service logs
+journalctl -u ha-linux-mqtt-relay.service -f
 ```
+
+## Home Assistant Integration
+
+Once the service is running, Home Assistant will automatically discover the relay device via MQTT Discovery. The device will appear in Home Assistant's integrations without any manual configuration needed.
+
+### MQTT Topics
+
+The service publishes to the following MQTT topics:
+
+- **Config Topic**: Used for Home Assistant auto-discovery (sends device configuration)
+- **State Topic**: Publishes the current relay state (`ON` or `OFF`)
+- **Set Topic**: Subscribes to commands to change the relay state
+- **Availability Topic**: Publishes availability status (`online` or `offline`)
+
+All topics are dynamically generated based on `config.ini` settings:
+
+```
+{topic_base}/relay{device_name}/{topic_config}
+{topic_base}/relay{device_name}/{topic_state}
+{topic_base}/relay{device_name}/{topic_set}
+{topic_base}/relay{device_name}/{topic_availability}
+```
+
+## Troubleshooting
+
+### Service Won't Start
+
+Check the service logs:
+
+```bash
+journalctl -u ha-linux-mqtt-relay.service -n 50 -e
+```
+
+### MQTT Connection Issues
+
+1. **Verify MQTT Broker**: Check that your MQTT broker is running and accessible
+   ```bash
+   # Test connection from your device
+   mosquitto_sub -h homeassistant.local -u mqtt_user -P your_password -t '#'
+   ```
+
+2. **Check Credentials**: Ensure username and password in `config.ini` are correct
+
+3. **Verify Broker Address**: Ensure `config.ini` has the correct broker hostname/IP
+
+### GPIO Issues
+
+1. **Check GPIO Pin Number**: Verify the pin number in `config.ini` matches your relay's GPIO pin
+2. **Check Permissions**: Ensure the user running the service has GPIO permissions
+3. **GPIO Already in Use**: Check if another process is using the same GPIO pin
+
+### Device Not Appearing in Home Assistant
+
+1. Check that MQTT integration is enabled in Home Assistant
+2. Verify the service is running: `systemctl status ha-linux-mqtt-relay.service`
+3. Check the device availability topic for `online` status
+4. Check Home Assistant logs for MQTT-related errors
+
+### Debugging
+
+To see detailed debug output:
+
+```bash
+# Run the script directly (not as a service)
+source .ha-linux-mqtt-relay/bin/activate
+python ha-linux-mqtt-relay.py
+```
+
+This will display logging output to the console for troubleshooting.
+
+## Development Notes
+
+- The code uses Python 3 with the `paho-mqtt` library for MQTT communication
+- GPIO control is handled by `RPi.GPIO` library
+- Configuration is read from `config.ini` using Python's `configparser`
+- The service maintains automatic reconnection to the MQTT broker with exponential backoff
+- Home Assistant discovery is done via the MQTT Discovery protocol
+
+## Resources
+
+- [Home Assistant MQTT Documentation](https://www.home-assistant.io/integrations/mqtt/)
+- [Home Assistant MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
+- [Paho MQTT Python Client](https://github.com/eclipse/paho.mqtt.python)
+- [RPi.GPIO Documentation](https://sourceforge.net/p/raspberry-gpio-python/wiki/Home/)
+
+## License
+
+See [LICENSE](LICENSE) file for details.
+
+## Code of Conduct
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.
 
