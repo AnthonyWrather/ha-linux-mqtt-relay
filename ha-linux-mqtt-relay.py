@@ -93,7 +93,6 @@ TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD = {
 
 # These will move to a config file.
 pin = int(config['sensor'].get('pin', '23').lower())
-# TODO: Disable this for now.
 GPIO.setmode(GPIO.BCM)             # choose BCM or BOARD
 GPIO.setup(pin, GPIO.OUT)           # set GPIO23 as an output
 

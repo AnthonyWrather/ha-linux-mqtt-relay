@@ -1,8 +1,8 @@
 [mqtt]
 
-hostname = homeassistant.lan
-username = REPLACEME
-password = REPLACEME
+broker = homeassistant.lan
+username = CHANGE_ME
+password = CHANGE_ME
 port = 1883
 timeout = 60
 
