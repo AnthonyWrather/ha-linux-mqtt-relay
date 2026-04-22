@@ -44,7 +44,7 @@ cd ha-linux-mqtt-relay
 ### 2. Create Python Virtual Environment
 
 ```bash
-python3 -m venv .ha-linux-mqtt-relay
+python -m venv .ha-linux-mqtt-relay
 source .ha-linux-mqtt-relay/bin/activate
 pip install -r requirements.txt
 ```
