@@ -9,7 +9,9 @@ import json
 import logging
 import random
 import time
+import re
 import datetime as dt
+from collections import defaultdict
 
 from paho.mqtt import client as mqtt_client
 from configparser import ConfigParser
@@ -20,7 +22,7 @@ config = ConfigParser(delimiters=('=', ))
 config.read('config.ini')
 ###############################################################################
 
-BROKER = config['mqtt'].get('broker', 'homeassistant.local').lower()
+BROKER = config['mqtt'].get('broker', 'homeassistant.local')
 PORT = int(config['mqtt'].get('port', '1883'))
 # generate client ID with pub prefix randomly
 CLIENT_ID = f'python-mqtt-tcp-pub-sub-{random.randint(0, 1000)}'
@@ -30,53 +32,37 @@ PASSWORD = config['mqtt'].get('password', 'CONFIG_ME')
 FIRST_RECONNECT_DELAY = 1
 RECONNECT_RATE = 2
 MAX_RECONNECT_COUNT = 12
-MAX_RECONNECT_DELAY = config['mqtt'].get('timeout', '60').lower()
+MAX_RECONNECT_DELAY = config['mqtt'].get('timeout', '60')
 
-# Define the main device and a single sensor.
-# Publish here to create or update the device.
-TOPIC_BASE = config['homeassistant'].get('topic_base', 'default/homeassistant/switch').lower() \
-    + '/relay' + config['homeassistant'].get('device_name', '/device').lower()
-TOPIC_MAINCABIN_RELAY_CONFIG = TOPIC_BASE + config['mqtt'].get('topic_config', '/config').lower()
+all_devices = defaultdict(list)
+devices = json.loads(config.get("homeassistant","device_names"))
+for device in devices:
+    TOPIC_BASE = config['homeassistant'].get('topic_base', 'default/homeassistant/switch')  \
+        + '/relay/' + device + '/'
 
-# Update Payload to ON/OFF
-# Set to the current state of the relay ON/OFF.
-# Publish here to broadcast the current state of the device.
-TOPIC_MAINCABIN_RELAY_STATE = TOPIC_BASE + config['mqtt'].get('topic_state', '/state').lower()
-TOPIC_MAINCABIN_RELAY_STATE_EXAMPLE = {
-  'on'
-}
+    devices_config = {
+        "topic_config": TOPIC_BASE + config['mqtt'].get('topic_config', 'config'),
+        "topic_set": TOPIC_BASE + config['mqtt'].get('topic_set', 'set'),
+        "topic_state": TOPIC_BASE + config['mqtt'].get('topic_state', 'state'),
+        "topic_availability": TOPIC_BASE + config['mqtt'].get('topic_availability', 'availability'),
+        "pin": 0
+    }
+    all_devices[device].append(devices_config)
 
-# Command Payload  ON/OFF
-# Receive a command to set the relay ON/OFF.
-# Subscribe here to get commands.
-TOPIC_MAINCABIN_RELAY_SET = TOPIC_BASE + config['mqtt'].get('topic_set', '/set').lower()
-TOPIC_MAINCABIN_RELAY_SET_EXAMPLE = {
-  'on'
-}
-
-
-# availability Payload  ONLINE/OFFLINE
-# Set to ONLINE on start and OFFLINE on exit.
-# Publish here to say this device is available.
-TOPIC_MAINCABIN_RELAY_AVAILABILITY = TOPIC_BASE + config['mqtt'].get('topic_availability', '/availability').lower()
-TOPIC_MAINCABIN_RELAY_AVAILABILITY_EXAMPLE = {
-  'online'
-}
-
-TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD = {
+RELAY_CONFIG_PAYLOAD = {
   "device_class":"switch",
-  "name": "Switch-01",
-  "state_topic": TOPIC_MAINCABIN_RELAY_STATE,
-  "command_topic": TOPIC_MAINCABIN_RELAY_SET,
-  "availability_topic": TOPIC_MAINCABIN_RELAY_AVAILABILITY,
+  "name": "",
+  "unique_id": "",
+  "state_topic": "",
+  "command_topic": "",
+  "availability_topic": "",
   "value_template":"{{value_json.switch}}",
   "optimistic": "false",
   "qos": "0",
   "retain": "true",
-  "unique_id": "switch_01",
   "device": {
-    "identifiers": ["relay_01"],
-    "name": "Relay-01",
+    "identifiers": ["linux_switches"],
+    "name": "Switches",
     "manufacturer": "Example Sensors Ltd.",
     "model": "Example Relay",
     "model_id": "On-Off-Switch",
@@ -86,29 +72,78 @@ TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD = {
   }
 }
 
+RELAY_ADDITIONAL_CONFIG_PAYLOAD = {
+  "device_class":"switch",
+  "name": "",
+  "unique_id": "",
+  "state_topic": "",
+  "command_topic": "",
+  "availability_topic": "",
+  "value_template":"{{value_json.switch}}",
+  "optimistic": "false",
+  "qos": "0",
+  "retain": "true",
+  "device": {
+    "identifiers": ["linux_switches"],
+  }
+}
 
 ###############################################################################
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0 and client.is_connected():
         logging.info("Connected to MQTT Broker!")
-        # Publish the Device config for auto discovery.
-        msg = json.dumps(TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD)
-        result = client.publish(TOPIC_MAINCABIN_RELAY_CONFIG, msg)
-        status = result[0]
-        if status != 0:
-            logging.info(f'Failed to send SWITCH config to topic {TOPIC_MAINCABIN_RELAY_CONFIG}')
-        else:
-            logging.info(f'Successfully sent SWITCH config to to topic {TOPIC_MAINCABIN_RELAY_CONFIG}')
-        # Publish the availability - ONLINE
-        result = client.publish(TOPIC_MAINCABIN_RELAY_AVAILABILITY, 'online')
-        status = result[0]
-        if status != 0:
-            logging.info(f'Failed to set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
-        else:
-            logging.info(f'Successfully set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
-        logging.info(f'Subscribing to topic {TOPIC_MAINCABIN_RELAY_SET}')
-        client.subscribe(TOPIC_MAINCABIN_RELAY_SET)
+
+        count = 0
+        for this_one in all_devices:
+            # Publish the Device config for auto discovery.
+            print('===================================================================')
+            print(f"Processing {this_one} on count {count}")
+            if count == 0:
+                # Set the primary payload.
+                print(this_one)
+                print(all_devices[this_one][0]['topic_state'])
+                print(all_devices[this_one][0]['topic_set'])
+                print(all_devices[this_one][0]['topic_availability'])
+                RELAY_CONFIG_PAYLOAD["name"] = this_one
+                RELAY_CONFIG_PAYLOAD["unique_id"] = this_one
+                RELAY_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
+                RELAY_CONFIG_PAYLOAD["command_topic"] = all_devices[this_one][0]['topic_set']
+                RELAY_CONFIG_PAYLOAD["availability_topic"] = all_devices[this_one][0]['topic_availability']
+                # print(RELAY_CONFIG_PAYLOAD)
+                msg = json.dumps(RELAY_CONFIG_PAYLOAD)
+                count += 1
+            else:
+                # Set the additional payload.
+                print(this_one)
+                print(all_devices[this_one][0]['topic_state'])
+                print(all_devices[this_one][0]['topic_set'])
+                print(all_devices[this_one][0]['topic_availability'])
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["name"] = this_one
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["unique_id"] = this_one
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["command_topic"] = all_devices[this_one][0]['topic_set']
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["availability_topic"] = all_devices[this_one][0]['topic_availability']
+                msg = json.dumps(RELAY_ADDITIONAL_CONFIG_PAYLOAD)
+                count += 1
+
+            print(f"Sending Config Message = {msg}")
+            result = client.publish(all_devices[this_one][0]['topic_config'], msg)
+            status = result[0]
+            if status != 0:
+                logging.info(f'Failed to send SWITCH config to topic {all_devices[this_one][0]['topic_config']}')
+            else:
+                logging.info(f'Successfully sent SWITCH config to to topic {all_devices[this_one][0]['topic_config']}')
+            # Publish the availability - ONLINE
+            result = client.publish(all_devices[this_one][0]['topic_availability'], 'online')
+            status = result[0]
+            if status != 0:
+                logging.info(f'Failed to set availability to online for topic {all_devices[this_one][0]['topic_availability']}')
+            else:
+                logging.info(f'Successfully set availability to online for topic {all_devices[this_one][0]['topic_availability']}')
+            logging.info(f'Subscribing to topic {all_devices[this_one][0]['topic_set']}')
+            client.subscribe(all_devices[this_one][0]['topic_set'])
+        print('===================================================================')
     else:
         logging.info(f'Failed to connect, return code {rc}')
 
@@ -123,12 +158,15 @@ def on_disconnect(client, userdata, rc):
         try:
             client.reconnect()
             logging.info("Reconnected successfully!")
-            result = client.publish(TOPIC_MAINCABIN_RELAY_AVAILABILITY, 'online')
-            status = result[0]
-            if status != 0:
-                logging.info(f'Failed to set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
-            else:
-                logging.info(f'Successfully set availability to online for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
+            # TODO: Need to set all devices as ONLINE
+            for device in all_devices:
+              print(f"Setting device {device} to ONLINE")
+              result = client.publish(all_devices[device][0]['topic_availability'], 'online')
+              status = result[0]
+              if status != 0:
+                  logging.info(f'Failed to set availability to online for topic {all_devices[device][0]['topic_availability']}')
+              else:
+                  logging.info(f'Successfully set availability to online for topic {all_devices[device][0]['topic_availability']}')
             # TODO: Discover if there is any scenario where I need to resubscribe?
             return
         except Exception as err:
@@ -145,16 +183,20 @@ def on_message(client, userdata, msg):
     # TODO: Need to rewrite this to use the native 1 and 0 which avoids the conversion.
     logging.info('==================================================================')
     logging.info(f'Message `{msg.payload.decode()}` from `{msg.topic}` topic')
+    # now its regex time... gmu?
+    pattern = r"(?<=/)[^/\n]+(?=/[^/\n]*$)"
+    device = (re.search(pattern, msg.topic)).group(0)
+    logging.info(f"Using device {device}")
     match msg.payload.decode():
         case 'ON':
             # Set state to ON
             logging.info(f'Received payload: {msg.payload.decode()}')
-            set_state(client, 'ON')
+            set_state(client, device, 'ON')
             return
         case 'OFF':
             # Set state to off
             logging.info(f'Received payload: {msg.payload.decode()}')
-            set_state(client, 'OFF')
+            set_state(client, device, 'OFF')
             return
         case _:
             logging.info(f'Received UNKNOWN payload: {msg.payload.decode()}')
@@ -181,11 +223,11 @@ def connect_mqtt():
             return client
         except Exception as err:
             logging.error("%s. Connection failed...", err)
-        except:
-            # this catches ALL other exceptions including errors.
-            # You won't get any error messages for debugging
-            # so only use it once your code is working
-            logging.info( "A general connection exception occurred!" )
+        # except:
+        #     # this catches ALL other exceptions including errors.
+        #     # You won't get any error messages for debugging
+        #     # so only use it once your code is working
+        #     logging.info( "A general connection exception occurred!" )
         reconnect_delay *= RECONNECT_RATE
         reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
         reconnect_count += 1
@@ -208,34 +250,37 @@ def publish(client, topic, payload):
     time.sleep(1)
 
 
-def set_state(client, state):
+def set_state(client, device, state):
+    # Need to set the device config to use.
+    state_topic = all_devices[device][0]['topic_state']
+    device_pin = all_devices[device][0]['pin']
     # Get the state of the pin
-    old_state = get_relay(pin)
+    old_state = get_relay(device_pin)
     if old_state:
         old_state = "ON"
     else:
         old_state =  "OFF"
-    logging.info(f'Initial pin state is {old_state} and the desired state is {state}')
+    logging.info(f'Initial pin ({device_pin}) state is {old_state} and the desired state is {state}')
     match state:
         case 'ON':
           logging.info("Received ON Command.")
           if state != old_state:
               # set pin state
-              logging.info(f"Set pin {pin} to sate {state}")
-              set_relay(pin, GPIO.HIGH)
+              logging.info(f"Set pin {device_pin} to sate {state}")
+              set_relay(device_pin, GPIO.HIGH)
           # publish new state
-          logging.info(f"Set state {TOPIC_MAINCABIN_RELAY_STATE} to sate ON")
-          result = client.publish(TOPIC_MAINCABIN_RELAY_STATE, 'ON')
+          logging.info(f"Set state {state_topic} to sate ON")
+          result = client.publish(state_topic, 'ON')
           return
         case 'OFF':
           logging.info("Received OFF command.")
           if state != old_state:
               # set pin state
-              logging.info(f"Set pin {pin} to sate {state}")
-              set_relay(pin, GPIO.LOW)
+              logging.info(f"Set pin {device_pin} to sate {state}")
+              set_relay(device_pin, GPIO.LOW)
           # publish new state
-          logging.info(f"Set state {TOPIC_MAINCABIN_RELAY_STATE} to sate OFF")
-          result = client.publish(TOPIC_MAINCABIN_RELAY_STATE, 'OFF')
+          logging.info(f"Set state {state_topic} to sate OFF")
+          result = client.publish(state_topic, 'OFF')
           return
         case _:
           logging.info(f'set_state: Received unknown state: {state}')
@@ -254,21 +299,20 @@ def dump_config_ini():
     print("\n===================================================================")
     print("config.ini")
     print("[mqtt]")
-    print(f"broker = {config['mqtt'].get('broker').lower()}")
+    print(f"broker = {config['mqtt'].get('broker') }")
     print(f"username = {config['mqtt'].get('username')}")
     print("password = ***REDACTED***")
-    print(f"port = {config['mqtt'].get('port').lower()}")
-    print(f"timeout = {config['mqtt'].get('timeout').lower()}")
+    print(f"port = {config['mqtt'].get('port') }")
+    print(f"timeout = {config['mqtt'].get('timeout') }")
     print("[sensor]")
-    print(f"pin = {config['sensor'].get('pin').lower()}")
-    print(f"interval = {config['sensor'].get('interval').lower()}")
+    print(f"pin = {config['sensor'].get('pin') }")
     print("[homeassistant]")
-    print(f"device_name = {config['homeassistant'].get('device_name').lower()}")
-    print(f"topic_base = {config['homeassistant'].get('topic_base').lower()}")
-    print(f"topic_config = {config['homeassistant'].get('topic_config').lower()}")
-    print(f"topic_state = {config['homeassistant'].get('topic_state').lower()}")
-    print(f"topic_set = {config['homeassistant'].get('topic_set').lower()}")
-    print(f"topic_availability = {config['homeassistant'].get('topic_availability').lower()}")
+    print(f"device_name = {config['homeassistant'].get('device_name') }")
+    print(f"topic_base = {config['homeassistant'].get('topic_base') }")
+    print(f"topic_config = {config['homeassistant'].get('topic_config') }")
+    print(f"topic_state = {config['homeassistant'].get('topic_state') }")
+    print(f"topic_set = {config['homeassistant'].get('topic_set') }")
+    print(f"topic_availability = {config['homeassistant'].get('topic_availability') }")
     print("===================================================================\n")
 
 
@@ -295,11 +339,11 @@ def run():
         # exits when you press CTRL+C
         logging.info( "Keyboard interrupt\n" )
 
-    except:
-        # this catches ALL other exceptions including errors.
-        # You won't get any error messages for debugging
-        # so only use it once your code is working
-        logging.info( "A general exception occurred!" )
+    # except:
+    #     # this catches ALL other exceptions including errors.
+    #     # You won't get any error messages for debugging
+    #     # so only use it once your code is working
+    #     logging.info( "A general exception occurred!" )
 
     finally:
         # this ensures a clean GPIO exit
@@ -312,11 +356,17 @@ def run():
 
 
 if __name__ == '__main__':
-    pin = int(config['sensor'].get('pin', '23').lower())
     GPIO.setmode(GPIO.BCM)             # choose BCM or BOARD
-    GPIO.setup(pin, GPIO.OUT)           # set GPIO23 as an output
+    # Get the pins
+    pins = json.loads(config.get("sensor","pins"))
+    count = 0
+    # Set the pins in the main struct
+    for this_one in all_devices:
+        all_devices[this_one][0]['pin'] = pins[count]
+        GPIO.setup(all_devices[this_one][0]['pin'], GPIO.OUT)
+        count += 1
 
     # Need to dump the config.
     # dump_config_ini()
-    dump_topic_config()
+    # dump_topic_config()
     run()

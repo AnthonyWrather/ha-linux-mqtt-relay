@@ -8,14 +8,13 @@ timeout = 60
 
 [sensor]
 
-pin = 23
-interval = 60
+pins = [23]                               # Must be an array. [1,2,3,4]
 
 [homeassistant]
 
-device_name = /fan
+device_names = ["fan"]                   # Must compliment pin. ["name-one","name-two","name-three","name-four"]
 topic_base = homeassistant/switch
-topic_config = /conf
-topic_state = /state
-topic_set = /set
-topic_availability = /availability
+topic_config = conf
+topic_state = state
+topic_set = set
+topic_availability = availability
