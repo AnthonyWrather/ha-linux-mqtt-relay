@@ -96,15 +96,14 @@ topic_availability = /availability  # Availability status topic suffix
 
 ```conf
 [sensor]
-pin = 23                 # GPIO pin number (BCM numbering)
-interval = 60            # Update interval in seconds
+pins = [23]              # GPIO pin numbers (BCM numbering) in the same order as device_names
 ```
 
 #### [homeassistant] Section
 
 ```conf
 [homeassistant]
-device_name = /fan              # Device identifier (used in MQTT topics)
+device_names = ["fan"]           # Device identifiers used in MQTT topics
 topic_base = homeassistant/switch  # Base topic for MQTT discovery
 ```
 
@@ -121,11 +120,10 @@ port = 1883
 timeout = 60
 
 [sensor]
-pin = 23
-interval = 60
+pins = [23,12,15]
 
 [homeassistant]
-device_name = /fan
+device_names = ["fan","light_01","light_02"]
 topic_base = homeassistant/switch
 topic_config = /config
 topic_state = /state
@@ -224,13 +222,13 @@ The service publishes to the following MQTT topics:
 - **Set Topic**: Subscribes to commands to change the relay state
 - **Availability Topic**: Publishes availability status (`online` or `offline`)
 
-All topics are dynamically generated based on `config.ini` settings:
+All topics are dynamically generated based on `config.ini` settings and each device name from `device_names`:
 
 ```
-{topic_base}/relay{device_name}/{topic_config}
-{topic_base}/relay{device_name}/{topic_state}
-{topic_base}/relay{device_name}/{topic_set}
-{topic_base}/relay{device_name}/{topic_availability}
+{topic_base}/relay/{device_name}/{topic_config}
+{topic_base}/relay/{device_name}/{topic_state}
+{topic_base}/relay/{device_name}/{topic_set}
+{topic_base}/relay/{device_name}/{topic_availability}
 ```
 
 ## Troubleshooting
@@ -257,9 +255,9 @@ journalctl -u ha-linux-mqtt-relay.service -n 50 -e
 
 ### GPIO Issues
 
-1. **Check GPIO Pin Number**: Verify the pin number in `config.ini` matches your relay's GPIO pin
+1. **Check GPIO Pin Numbers**: Verify the `pins` list in `config.ini` matches your relay GPIO pins and is in the same order as `device_names`
 2. **Check Permissions**: Ensure the user running the service has GPIO permissions
-3. **GPIO Already in Use**: Check if another process is using the same GPIO pin
+3. **GPIO Already in Use**: Check if another process is using the same GPIO pins
 
 ### Device Not Appearing in Home Assistant
 
