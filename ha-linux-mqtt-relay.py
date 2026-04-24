@@ -90,35 +90,33 @@ RELAY_ADDITIONAL_CONFIG_PAYLOAD = {
 
 ###############################################################################
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0 and client.is_connected():
         logging.info("Connected to MQTT Broker!")
-
         count = 0
         for this_one in all_devices:
             # Publish the Device config for auto discovery.
-            print('===================================================================')
-            print(f"Processing {this_one} on count {count}")
+            logging.info("===================================================================")
+            logging.info(f"Processing device {this_one}")
             if count == 0:
                 # Set the primary payload.
-                print(this_one)
-                print(all_devices[this_one][0]['topic_state'])
-                print(all_devices[this_one][0]['topic_set'])
-                print(all_devices[this_one][0]['topic_availability'])
+                logging.info(f"State topic: {all_devices[this_one][0]['topic_state']}")
+                logging.info(f"Command topic: {all_devices[this_one][0]['topic_set']}")
+                logging.info(f"Availability topic: {all_devices[this_one][0]['topic_availability']}")
                 RELAY_CONFIG_PAYLOAD["name"] = this_one
                 RELAY_CONFIG_PAYLOAD["unique_id"] = this_one
                 RELAY_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
                 RELAY_CONFIG_PAYLOAD["command_topic"] = all_devices[this_one][0]['topic_set']
                 RELAY_CONFIG_PAYLOAD["availability_topic"] = all_devices[this_one][0]['topic_availability']
-                # print(RELAY_CONFIG_PAYLOAD)
+                # logging.info(RELAY_CONFIG_PAYLOAD)
                 msg = json.dumps(RELAY_CONFIG_PAYLOAD)
                 count += 1
             else:
                 # Set the additional payload.
-                print(this_one)
-                print(all_devices[this_one][0]['topic_state'])
-                print(all_devices[this_one][0]['topic_set'])
-                print(all_devices[this_one][0]['topic_availability'])
+                logging.info(f"Processing additional device {this_one}")
+                logging.info(f"State topic: {all_devices[this_one][0]['topic_state']}")
+                logging.info(f"Command topic: {all_devices[this_one][0]['topic_set']}")
+                logging.info(f"Availability topic: {all_devices[this_one][0]['topic_availability']}")
                 RELAY_ADDITIONAL_CONFIG_PAYLOAD["name"] = this_one
                 RELAY_ADDITIONAL_CONFIG_PAYLOAD["unique_id"] = this_one
                 RELAY_ADDITIONAL_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
@@ -127,13 +125,13 @@ def on_connect(client, userdata, flags, rc):
                 msg = json.dumps(RELAY_ADDITIONAL_CONFIG_PAYLOAD)
                 count += 1
 
-            print(f"Sending Config Message = {msg}")
+            logging.info(f"Sending Config Message = {msg}")
             result = client.publish(all_devices[this_one][0]['topic_config'], msg)
             status = result[0]
             if status != 0:
                 logging.info(f'Failed to send SWITCH config to topic {all_devices[this_one][0]['topic_config']}')
             else:
-                logging.info(f'Successfully sent SWITCH config to to topic {all_devices[this_one][0]['topic_config']}')
+                logging.info(f'Successfully sent SWITCH config to topic {all_devices[this_one][0]['topic_config']}')
             # Publish the availability - ONLINE
             result = client.publish(all_devices[this_one][0]['topic_availability'], 'online')
             status = result[0]
@@ -143,7 +141,8 @@ def on_connect(client, userdata, flags, rc):
                 logging.info(f'Successfully set availability to online for topic {all_devices[this_one][0]['topic_availability']}')
             logging.info(f'Subscribing to topic {all_devices[this_one][0]['topic_set']}')
             client.subscribe(all_devices[this_one][0]['topic_set'])
-        print('===================================================================')
+        logging.info('===================================================================')
+        logging.info('Successfully finished device setup.')
     else:
         logging.info(f'Failed to connect, return code {rc}')
 
@@ -158,16 +157,15 @@ def on_disconnect(client, userdata, rc):
         try:
             client.reconnect()
             logging.info("Reconnected successfully!")
-            # TODO: Need to set all devices as ONLINE
             for device in all_devices:
-              print(f"Setting device {device} to ONLINE")
+              logging.info(f"Setting device {device} to ONLINE")
               result = client.publish(all_devices[device][0]['topic_availability'], 'online')
               status = result[0]
               if status != 0:
                   logging.info(f'Failed to set availability to online for topic {all_devices[device][0]['topic_availability']}')
               else:
                   logging.info(f'Successfully set availability to online for topic {all_devices[device][0]['topic_availability']}')
-            # TODO: Discover if there is any scenario where I need to resubscribe?
+            # TODO: Discover if there is any scenario where I need to resubscribe during the reconnect process?
             return
         except Exception as err:
             logging.error("%s. Reconnect failed. Retrying...", err)
@@ -180,7 +178,6 @@ def on_disconnect(client, userdata, rc):
 
 
 def on_message(client, userdata, msg):
-    # TODO: Need to rewrite this to use the native 1 and 0 which avoids the conversion.
     logging.info('==================================================================')
     logging.info(f'Message `{msg.payload.decode()}` from `{msg.topic}` topic')
     # now its regex time... gmu?
@@ -204,13 +201,12 @@ def on_message(client, userdata, msg):
 
 
 def connect_mqtt():
-    # TODO: Need to update this to a V2 interface.
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
         logging.info("Connecting in %d seconds...", reconnect_delay)
         time.sleep(reconnect_delay)
         try:
-            client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1, CLIENT_ID)
+            client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, CLIENT_ID)
             client.username_pw_set(USERNAME, PASSWORD)
             client.on_connect = on_connect
             client.on_message = on_message
@@ -223,11 +219,11 @@ def connect_mqtt():
             return client
         except Exception as err:
             logging.error("%s. Connection failed...", err)
-        # except:
-        #     # this catches ALL other exceptions including errors.
-        #     # You won't get any error messages for debugging
-        #     # so only use it once your code is working
-        #     logging.info( "A general connection exception occurred!" )
+        except:
+            # this catches ALL other exceptions including errors.
+            # You won't get any error messages for debugging
+            # so only use it once your code is working
+            logging.info( "A general connection exception occurred!" )
         reconnect_delay *= RECONNECT_RATE
         reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
         reconnect_count += 1
@@ -260,7 +256,7 @@ def set_state(client, device, state):
         old_state = "ON"
     else:
         old_state =  "OFF"
-    logging.info(f'Initial pin ({device_pin}) state is {old_state} and the desired state is {state}')
+        logging.info(f'Initial pin ({device_pin}) state is {old_state} and the desired state is {state}')
     match state:
         case 'ON':
           logging.info("Received ON Command.")
@@ -296,33 +292,33 @@ def get_relay(pin):
 
 
 def dump_config_ini():
-    print("\n===================================================================")
-    print("config.ini")
-    print("[mqtt]")
-    print(f"broker = {config['mqtt'].get('broker') }")
-    print(f"username = {config['mqtt'].get('username')}")
-    print("password = ***REDACTED***")
-    print(f"port = {config['mqtt'].get('port') }")
-    print(f"timeout = {config['mqtt'].get('timeout') }")
-    print("[sensor]")
-    print(f"pin = {config['sensor'].get('pin') }")
-    print("[homeassistant]")
-    print(f"device_name = {config['homeassistant'].get('device_name') }")
-    print(f"topic_base = {config['homeassistant'].get('topic_base') }")
-    print(f"topic_config = {config['homeassistant'].get('topic_config') }")
-    print(f"topic_state = {config['homeassistant'].get('topic_state') }")
-    print(f"topic_set = {config['homeassistant'].get('topic_set') }")
-    print(f"topic_availability = {config['homeassistant'].get('topic_availability') }")
-    print("===================================================================\n")
+    logging.info("\n===================================================================")
+    logging.info("config.ini")
+    logging.info("[mqtt]")
+    logging.info(f"broker = {config['mqtt'].get('broker') }")
+    logging.info(f"username = {config['mqtt'].get('username')}")
+    logging.info("password = ***REDACTED***")
+    logging.info(f"port = {config['mqtt'].get('port') }")
+    logging.info(f"timeout = {config['mqtt'].get('timeout') }")
+    logging.info("[sensor]")
+    logging.info(f"pin = {config['sensor'].get('pin') }")
+    logging.info("[homeassistant]")
+    logging.info(f"device_name = {config['homeassistant'].get('device_name') }")
+    logging.info(f"topic_base = {config['homeassistant'].get('topic_base') }")
+    logging.info(f"topic_config = {config['homeassistant'].get('topic_config') }")
+    logging.info(f"topic_state = {config['homeassistant'].get('topic_state') }")
+    logging.info(f"topic_set = {config['homeassistant'].get('topic_set') }")
+    logging.info(f"topic_availability = {config['homeassistant'].get('topic_availability') }")
+    logging.info("===================================================================\n")
 
 
 def dump_topic_config():
-    print("\n===================================================================")
-    print("Topic Configuration")
-    print(f"BROKER: {BROKER}")
-    print(f"TOPIC: {TOPIC_MAINCABIN_RELAY_CONFIG}")
-    print(f"PAYLOAD: \n{json.dumps(TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD, indent=2)})")
-    print("===================================================================\n")
+    logging.info("\n===================================================================")
+    logging.info("Topic Configuration")
+    logging.info(f"BROKER: {BROKER}")
+    logging.info(f"TOPIC: {TOPIC_MAINCABIN_RELAY_CONFIG}")
+    logging.info(f"PAYLOAD: \n{json.dumps(TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD, indent=2)})")
+    logging.info("===================================================================\n")
 
 
 ###############################################################################
