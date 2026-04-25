@@ -32,7 +32,7 @@ PASSWORD = config['mqtt'].get('password', 'CONFIG_ME')
 FIRST_RECONNECT_DELAY = 1
 RECONNECT_RATE = 2
 MAX_RECONNECT_COUNT = 12
-MAX_RECONNECT_DELAY = config['mqtt'].get('timeout', '60')
+MAX_RECONNECT_DELAY = int(config['mqtt'].get('timeout', '60'))
 
 all_devices = defaultdict(list)
 devices = json.loads(config.get("homeassistant","device_names"))
@@ -147,7 +147,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
         logging.info(f'Failed to connect, return code {rc}')
 
 
-def on_disconnect(client, userdata, rc):
+def on_disconnect(client, userdata, flags, rc, properties):
     logging.info("Disconnected with result code: %s", rc)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
