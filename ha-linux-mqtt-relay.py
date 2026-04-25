@@ -108,7 +108,6 @@ def on_connect(client, userdata, flags, rc, properties=None):
                 RELAY_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
                 RELAY_CONFIG_PAYLOAD["command_topic"] = all_devices[this_one][0]['topic_set']
                 RELAY_CONFIG_PAYLOAD["availability_topic"] = all_devices[this_one][0]['topic_availability']
-                # logging.info(RELAY_CONFIG_PAYLOAD)
                 msg = json.dumps(RELAY_CONFIG_PAYLOAD)
                 count += 1
             else:
@@ -165,7 +164,7 @@ def on_disconnect(client, userdata, flags, rc, properties):
                   logging.info(f'Failed to set availability to online for topic {all_devices[device][0]['topic_availability']}')
               else:
                   logging.info(f'Successfully set availability to online for topic {all_devices[device][0]['topic_availability']}')
-            # TODO: Discover if there is any scenario where I need to resubscribe during the reconnect process?
+            # If there are any scenarios where I need to resubscribe here is the place to do it.
             return
         except Exception as err:
             logging.error("%s. Reconnect failed. Retrying...", err)
@@ -180,7 +179,7 @@ def on_disconnect(client, userdata, flags, rc, properties):
 def on_message(client, userdata, msg):
     logging.info('==================================================================')
     logging.info(f'Message `{msg.payload.decode()}` from `{msg.topic}` topic')
-    # now its regex time... gmu?
+    # now its regex time...
     pattern = r"(?<=/)[^/\n]+(?=/[^/\n]*$)"
     device = (re.search(pattern, msg.topic)).group(0)
     logging.info(f"Using device {device}")
@@ -237,7 +236,6 @@ def publish(client, topic, payload):
         logging.error("publish: MQTT client is not connected!")
         time.sleep(1)
     result = client.publish(topic, msg)
-    # result: [0, 1]
     status = result[0]
     if status == 0:
         logging.info(f'Send `{msg}` to topic `{topic}`')
@@ -291,36 +289,6 @@ def get_relay(pin):
     return GPIO.input(pin)
 
 
-def dump_config_ini():
-    logging.info("\n===================================================================")
-    logging.info("config.ini")
-    logging.info("[mqtt]")
-    logging.info(f"broker = {config['mqtt'].get('broker') }")
-    logging.info(f"username = {config['mqtt'].get('username')}")
-    logging.info("password = ***REDACTED***")
-    logging.info(f"port = {config['mqtt'].get('port') }")
-    logging.info(f"timeout = {config['mqtt'].get('timeout') }")
-    logging.info("[sensor]")
-    logging.info(f"pin = {config['sensor'].get('pin') }")
-    logging.info("[homeassistant]")
-    logging.info(f"device_name = {config['homeassistant'].get('device_name') }")
-    logging.info(f"topic_base = {config['homeassistant'].get('topic_base') }")
-    logging.info(f"topic_config = {config['homeassistant'].get('topic_config') }")
-    logging.info(f"topic_state = {config['homeassistant'].get('topic_state') }")
-    logging.info(f"topic_set = {config['homeassistant'].get('topic_set') }")
-    logging.info(f"topic_availability = {config['homeassistant'].get('topic_availability') }")
-    logging.info("===================================================================\n")
-
-
-def dump_topic_config():
-    logging.info("\n===================================================================")
-    logging.info("Topic Configuration")
-    logging.info(f"BROKER: {BROKER}")
-    logging.info(f"TOPIC: {TOPIC_MAINCABIN_RELAY_CONFIG}")
-    logging.info(f"PAYLOAD: \n{json.dumps(TOPIC_MAINCABIN_RELAY_CONFIG_PAYLOAD, indent=2)})")
-    logging.info("===================================================================\n")
-
-
 ###############################################################################
 def run():
     try:
@@ -361,8 +329,4 @@ if __name__ == '__main__':
         all_devices[this_one][0]['pin'] = pins[count]
         GPIO.setup(all_devices[this_one][0]['pin'], GPIO.OUT)
         count += 1
-
-    # Need to dump the config.
-    # dump_config_ini()
-    # dump_topic_config()
     run()
