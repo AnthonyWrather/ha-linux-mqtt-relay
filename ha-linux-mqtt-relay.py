@@ -94,52 +94,52 @@ def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0 and client.is_connected():
         logging.info("Connected to MQTT Broker!")
         count = 0
-        for this_one in all_devices:
+        for device, data in all_devices.items():
             # Publish the Device config for auto discovery.
             logging.info("===================================================================")
-            logging.info(f"Processing device {this_one}")
+            logging.info(f"Processing device {device}")
             if count == 0:
                 # Set the primary payload.
-                logging.info(f"State topic: {all_devices[this_one][0]['topic_state']}")
-                logging.info(f"Command topic: {all_devices[this_one][0]['topic_set']}")
-                logging.info(f"Availability topic: {all_devices[this_one][0]['topic_availability']}")
-                RELAY_CONFIG_PAYLOAD["name"] = this_one
-                RELAY_CONFIG_PAYLOAD["unique_id"] = this_one
-                RELAY_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
-                RELAY_CONFIG_PAYLOAD["command_topic"] = all_devices[this_one][0]['topic_set']
-                RELAY_CONFIG_PAYLOAD["availability_topic"] = all_devices[this_one][0]['topic_availability']
+                logging.info(f"State topic: {data[0]['topic_state']}")
+                logging.info(f"Command topic: {data[0]['topic_set']}")
+                logging.info(f"Availability topic: {data[0]['topic_availability']}")
+                RELAY_CONFIG_PAYLOAD["name"] = device
+                RELAY_CONFIG_PAYLOAD["unique_id"] = device
+                RELAY_CONFIG_PAYLOAD["state_topic"] = data[0]['topic_state']
+                RELAY_CONFIG_PAYLOAD["command_topic"] = data[0]['topic_set']
+                RELAY_CONFIG_PAYLOAD["availability_topic"] = data[0]['topic_availability']
                 msg = json.dumps(RELAY_CONFIG_PAYLOAD)
                 count += 1
             else:
                 # Set the additional payload.
-                logging.info(f"Processing additional device {this_one}")
-                logging.info(f"State topic: {all_devices[this_one][0]['topic_state']}")
-                logging.info(f"Command topic: {all_devices[this_one][0]['topic_set']}")
-                logging.info(f"Availability topic: {all_devices[this_one][0]['topic_availability']}")
-                RELAY_ADDITIONAL_CONFIG_PAYLOAD["name"] = this_one
-                RELAY_ADDITIONAL_CONFIG_PAYLOAD["unique_id"] = this_one
-                RELAY_ADDITIONAL_CONFIG_PAYLOAD["state_topic"] = all_devices[this_one][0]['topic_state']
-                RELAY_ADDITIONAL_CONFIG_PAYLOAD["command_topic"] = all_devices[this_one][0]['topic_set']
-                RELAY_ADDITIONAL_CONFIG_PAYLOAD["availability_topic"] = all_devices[this_one][0]['topic_availability']
+                logging.info(f"Processing additional device {device}")
+                logging.info(f"State topic: {data[0]['topic_state']}")
+                logging.info(f"Command topic: {data[0]['topic_set']}")
+                logging.info(f"Availability topic: {data[0]['topic_availability']}")
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["name"] = device
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["unique_id"] = device
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["state_topic"] = data[0]['topic_state']
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["command_topic"] = data[0]['topic_set']
+                RELAY_ADDITIONAL_CONFIG_PAYLOAD["availability_topic"] = data[0]['topic_availability']
                 msg = json.dumps(RELAY_ADDITIONAL_CONFIG_PAYLOAD)
                 count += 1
 
             logging.info(f"Sending Config Message = {msg}")
-            result = client.publish(all_devices[this_one][0]['topic_config'], msg)
+            result = client.publish(data[0]['topic_config'], msg)
             status = result[0]
             if status != 0:
-                logging.info(f'Failed to send SWITCH config to topic {all_devices[this_one][0]['topic_config']}')
+                logging.info(f'Failed to send SWITCH config to topic {data[0]['topic_config']}')
             else:
-                logging.info(f'Successfully sent SWITCH config to topic {all_devices[this_one][0]['topic_config']}')
+                logging.info(f'Successfully sent SWITCH config to topic {data[0]['topic_config']}')
             # Publish the availability - ONLINE
-            result = client.publish(all_devices[this_one][0]['topic_availability'], 'online')
+            result = client.publish(data[0]['topic_availability'], 'online')
             status = result[0]
             if status != 0:
-                logging.info(f'Failed to set availability to online for topic {all_devices[this_one][0]['topic_availability']}')
+                logging.info(f'Failed to set availability to online for topic {data[0]['topic_availability']}')
             else:
-                logging.info(f'Successfully set availability to online for topic {all_devices[this_one][0]['topic_availability']}')
-            logging.info(f'Subscribing to topic {all_devices[this_one][0]['topic_set']}')
-            client.subscribe(all_devices[this_one][0]['topic_set'])
+                logging.info(f'Successfully set availability to online for topic {data[0]['topic_availability']}')
+            logging.info(f'Subscribing to topic {data[0]['topic_set']}')
+            client.subscribe(data[0]['topic_set'])
         logging.info('===================================================================')
         logging.info('Successfully finished device setup.')
     else:
@@ -313,10 +313,14 @@ def run():
         # this ensures a clean GPIO exit
         GPIO.cleanup()
         if client is not None and client.is_connected():
-          result = client.publish(TOPIC_MAINCABIN_RELAY_AVAILABILITY, 'offline')
-          status = result[0]
-          if status != 0:
-              logging.info(f'Failed to set availability to OFFLINE for topic {TOPIC_MAINCABIN_RELAY_AVAILABILITY}')
+          # RELAY_CONFIG_PAYLOAD["availability_topic"] = data[0]['topic_availability']
+          for device, data in all_devices.items():
+              result = client.publish(data[0]['topic_availability'], 'offline')
+              status = result[0]
+              if status != 0:
+                  logging.info(f'Failed to set availability to OFFLINE for topic {data[0]['topic_availability']}')
+              else:
+                  logging.info(f'Successfully set availability to OFFLINE for topic {data[0]['topic_availability']}')
 
 
 if __name__ == '__main__':
@@ -325,8 +329,8 @@ if __name__ == '__main__':
     pins = json.loads(config.get("sensor","pins"))
     count = 0
     # Set the pins in the main struct
-    for this_one in all_devices:
-        all_devices[this_one][0]['pin'] = pins[count]
-        GPIO.setup(all_devices[this_one][0]['pin'], GPIO.OUT)
+    for device in all_devices:
+        all_devices[device][0]['pin'] = pins[count]
+        GPIO.setup(all_devices[device][0]['pin'], GPIO.OUT)
         count += 1
     run()
