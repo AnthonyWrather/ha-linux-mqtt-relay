@@ -33,6 +33,7 @@ FIRST_RECONNECT_DELAY = 1
 RECONNECT_RATE = 2
 MAX_RECONNECT_COUNT = 12
 MAX_RECONNECT_DELAY = int(config['mqtt'].get('timeout', '60'))
+HOMEASSISTANT_STATUS_TOPIC = 'homeassistant/status'
 
 all_devices = defaultdict(list)
 devices = json.loads(config.get("homeassistant","device_names"))
@@ -91,6 +92,13 @@ RELAY_ADDITIONAL_CONFIG_PAYLOAD = {
 ###############################################################################
 
 def on_connect(client, userdata, flags, rc, properties=None):
+    logging.info(f"Reached: On Connect with result code {rc}")
+    setup_device(rc, client)
+
+
+def setup_device(rc, client):
+    logging.info("Reached: Setup Device.")
+    # Send the config and enable everything.
     if rc == 0 and client.is_connected():
         logging.info("Connected to MQTT Broker!")
         count = 0
@@ -132,6 +140,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
             else:
                 logging.info(f'Successfully sent SWITCH config to topic {data[0]['topic_config']}')
             # Publish the availability - ONLINE
+            time.sleep(0.5)
             result = client.publish(data[0]['topic_availability'], 'online')
             status = result[0]
             if status != 0:
@@ -140,6 +149,10 @@ def on_connect(client, userdata, flags, rc, properties=None):
                 logging.info(f'Successfully set availability to online for topic {data[0]['topic_availability']}')
             logging.info(f'Subscribing to topic {data[0]['topic_set']}')
             client.subscribe(data[0]['topic_set'])
+            logging.info(f'Subscribing to topic {HOMEASSISTANT_STATUS_TOPIC}')
+            client.subscribe(HOMEASSISTANT_STATUS_TOPIC)
+            time.sleep(0.5)
+            set_state(client, device)
         logging.info('===================================================================')
         logging.info('Successfully finished device setup.')
     else:
@@ -147,7 +160,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
 
 def on_disconnect(client, userdata, flags, rc, properties):
-    logging.info("Disconnected with result code: %s", rc)
+    logging.info("Reached: Disconnected with result code: %s", rc)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
         logging.info("Reconnecting in %d seconds...", reconnect_delay)
@@ -178,28 +191,52 @@ def on_disconnect(client, userdata, flags, rc, properties):
 
 def on_message(client, userdata, msg):
     logging.info('==================================================================')
-    logging.info(f'Message `{msg.payload.decode()}` from `{msg.topic}` topic')
-    # now its regex time...
-    pattern = r"(?<=/)[^/\n]+(?=/[^/\n]*$)"
-    device = (re.search(pattern, msg.topic)).group(0)
-    logging.info(f"Using device {device}")
-    match msg.payload.decode():
-        case 'ON':
-            # Set state to ON
-            logging.info(f'Received payload: {msg.payload.decode()}')
-            set_state(client, device, 'ON')
-            return
-        case 'OFF':
-            # Set state to off
-            logging.info(f'Received payload: {msg.payload.decode()}')
-            set_state(client, device, 'OFF')
-            return
+    logging.info(f'Reached: On Message `{msg.payload.decode()}` from `{msg.topic}` topic')
+    match msg.topic:
+        # case str(HOMEASSISTANT_STATUS_TOPIC):
+        case str('homeassistant/status'):
+            logging.info(f"Received message on {msg.topic} topic: {msg.payload.decode()}")
+            match msg.payload.decode():
+                case 'online':
+                    if client is not None and client.is_connected():
+                        logging.info("Client is already connected, need to disconnect.")
+                        # client.disconnect()
+                        # client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, CLIENT_ID)
+                        client.reconnect()
+                    else:
+                        logging.info("Client is not connected.")
+                    setup_device(0, client)
+                    return
+
+                case 'offline':
+                    # Could switch off the device?
+                    return
+                case _:
+                    logging.info(f'Received UNKNOWN payload: {msg.payload.decode()}')
+                    return
         case _:
-            logging.info(f'Received UNKNOWN payload: {msg.payload.decode()}')
-            return
+            # now its regex time...
+            pattern = r"(?<=/)[^/\n]+(?=/[^/\n]*$)"
+            device = (re.search(pattern, msg.topic)).group(0)
+            logging.info(f"Using device {device}")
+            match msg.payload.decode():
+                case 'ON':
+                    # Set state to ON
+                    logging.info(f'Received payload: {msg.payload.decode()}')
+                    set_state(client, device, 'ON')
+                    return
+                case 'OFF':
+                    # Set state to off
+                    logging.info(f'Received payload: {msg.payload.decode()}')
+                    set_state(client, device, 'OFF')
+                    return
+                case _:
+                    logging.info(f'Received UNKNOWN payload: {msg.payload.decode()}')
+                    return
 
 
 def connect_mqtt():
+    logging.info("Reached: Connect MQTT")
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
         logging.info("Connecting in %d seconds...", reconnect_delay)
@@ -231,7 +268,7 @@ def connect_mqtt():
 def publish(client, topic, payload):
     logging.info('==================================================================')
     msg = json.dumps(payload)
-    logging.info(f'Sending Message `{msg}` to `{topic}` topic')
+    logging.info(f'Reached: Publish Message `{msg}` to `{topic}` topic')
     if not client.is_connected():
         logging.error("publish: MQTT client is not connected!")
         time.sleep(1)
@@ -244,17 +281,24 @@ def publish(client, topic, payload):
     time.sleep(1)
 
 
-def set_state(client, device, state):
+def set_state(client, device, state=None):
     # Need to set the device config to use.
+    logging.info("Set State")
     state_topic = all_devices[device][0]['topic_state']
     device_pin = all_devices[device][0]['pin']
+    if state == None:
+        logging.info(f'set_state: No state provided, using current state of pin {device_pin}')
+        if get_relay(all_devices[device][0]['pin']):
+            state = 'ON'
+        else:
+            state = 'OFF'
     # Get the state of the pin
     old_state = get_relay(device_pin)
     if old_state:
         old_state = "ON"
     else:
         old_state =  "OFF"
-        logging.info(f'Initial pin ({device_pin}) state is {old_state} and the desired state is {state}')
+    logging.info(f'Initial pin ({device_pin}) state is {old_state} and the desired state is {state}')
     match state:
         case 'ON':
           logging.info("Received ON Command.")
@@ -310,6 +354,7 @@ def run():
     #     logging.info( "A general exception occurred!" )
 
     finally:
+        logging.info(f'Reached Finally!')
         # this ensures a clean GPIO exit
         GPIO.cleanup()
         if client is not None and client.is_connected():
